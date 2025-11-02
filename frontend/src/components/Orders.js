@@ -1,48 +1,90 @@
-import React, { useEffect, useState } from "react";
+// src/pages/Orders.js
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
 import "bootstrap/dist/css/bootstrap.min.css";
 
 export default function Orders() {
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  const [authLoading, setAuthLoading] = useState(true);
+  const [user, setUser] = useState(null);
+
+  const [orders, setOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+
+  // Prevent duplicate redirect/alert under StrictMode
+  const redirectedRef = useRef(false);
+
+  // 1) Verify auth first
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      navigate("/login");
-      return;
+    let cancelled = false;
+
+    async function verify() {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) return; // not logged in
+        const { data } = await api.get("/api/auth/me"); // if baseURL already has /api -> change to "/auth/me"
+        if (!cancelled) setUser(data);
+      } catch {
+        // token missing/invalid → user stays null
+      } finally {
+        if (!cancelled) setAuthLoading(false);
+      }
     }
 
-    const load = async () => {
+    verify();
+    return () => { cancelled = true; };
+  }, []);
+
+  // 2) Redirect to login only after auth check finishes
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user && !redirectedRef.current) {
+      redirectedRef.current = true;
+      alert("Please login to view your orders.");
+      navigate("/login", { replace: true });
+    }
+  }, [authLoading, user, navigate]);
+
+  // 3) Load orders once we know the user is authenticated
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadOrders() {
+      if (authLoading || !user) return; // wait until verified
+      setLoadingOrders(true);
       try {
-        const res = await api.get("/orders");
+        const res = await api.get("/api/orders"); // if baseURL has /api -> change to "/orders"
         const data = Array.isArray(res.data) ? res.data : [];
 
-        // ✅ Deduplicate by Mongo _id (defensive in case the API returns duplicates)
+        // de-duplicate (defensive)
         const byId = new Map();
-        for (const o of data) {
-          if (!byId.has(o._id)) byId.set(o._id, o);
-        }
+        for (const o of data) if (!byId.has(o._id)) byId.set(o._id, o);
 
-        // (Optional) ensure newest first even if backend forgets to sort
+        // newest first (defensive)
         const uniqueSorted = [...byId.values()].sort(
           (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
         );
 
-        setOrders(uniqueSorted);
+        if (!cancelled) setOrders(uniqueSorted);
       } catch (err) {
-        alert(err?.response?.data?.message || "Failed to load orders.");
+        if (!cancelled) {
+          alert(err?.response?.data?.message || "Failed to load orders.");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoadingOrders(false);
       }
-    };
+    }
 
-    load();
-  }, [navigate]);
+    loadOrders();
+    return () => { cancelled = true; };
+  }, [authLoading, user]);
 
-  const noOrders = !loading && orders.length === 0;
+  // While verifying auth, or immediately after redirecting, render nothing
+  if (authLoading || (!user && redirectedRef.current)) return null;
+
+  const noOrders = !loadingOrders && orders.length === 0;
 
   return (
     <div
@@ -55,44 +97,32 @@ export default function Orders() {
       }}
     >
       <div className="container">
-
-        {/* 🔙 Back actions */}
+        {/* Top actions */}
         <div className="d-flex justify-content-between align-items-center mb-3">
           <button
             className="btn btn-outline-secondary"
-            onClick={() => {
-              // try to go back; if there's no history entry, go home
-              if (window.history.length > 1) navigate(-1);
-              else navigate("/");
-            }}
+            onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/"))}
           >
             ← Back
           </button>
-
-          <button
-            className="btn btn-outline-danger"
-            onClick={() => navigate("/")}
-          >
+          <button className="btn btn-outline-danger" onClick={() => navigate("/")}>
             🏠 Home
           </button>
         </div>
 
         <h2 className="text-danger fw-bold text-center mb-4">📦 My Orders</h2>
 
-        {loading ? (
+        {loadingOrders ? (
           <p className="text-center text-muted">Loading your orders…</p>
         ) : noOrders ? (
           <div className="text-center mt-5">
             <img
               src="https://cdn-icons-png.flaticon.com/512/2038/2038854.png"
               alt="Empty Orders"
-              style={{ width: "150px", marginBottom: "20px", opacity: 0.8 }}
+              style={{ width: 150, marginBottom: 20, opacity: 0.8 }}
             />
             <h5 className="text-muted mb-3">No orders yet.</h5>
-            <button
-              className="btn btn-danger px-4"
-              onClick={() => navigate("/restaurants")}
-            >
+            <button className="btn btn-danger px-4" onClick={() => navigate("/restaurants")}>
               🍴 Go to Restaurants
             </button>
           </div>
@@ -110,13 +140,8 @@ export default function Orders() {
                     </p>
                     <ul className="list-group mb-3">
                       {order.items.map((it, idx) => (
-                        <li
-                          key={idx}
-                          className="list-group-item d-flex justify-content-between"
-                        >
-                          <span>
-                            {(it.name || it?.foodItem?.name || "Item")} × {it.quantity}
-                          </span>
+                        <li key={idx} className="list-group-item d-flex justify-content-between">
+                          <span>{(it.name || it?.foodItem?.name || "Item")} × {it.quantity}</span>
                           <span>
                             {typeof it.price === "number"
                               ? `₹${(it.price * it.quantity).toFixed(2)}`
