@@ -26,25 +26,29 @@ export default function Orders() {
   // 1) Verify auth first (using token from interceptor/localStorage)
   useEffect(() => {
     let cancelled = false;
+
     (async () => {
       try {
         const token = localStorage.getItem("token");
-        if (!token) return; // not logged in
+        if (!token) {
+          // not logged in
+          return;
+        }
         const { data } = await api.get(ME_PATH);
         if (!cancelled) setUser(data);
-      } catch (err) {
-        // leave user null; optionally log for debugging
-        // console.error("auth/me failed:", err?.response?.status, err?.message);
+      } catch {
+        // token missing/invalid — leave user null
       } finally {
         if (!cancelled) setAuthLoading(false);
       }
     })();
+
     return () => {
       cancelled = true;
     };
   }, [ME_PATH]);
 
-  // 2) Redirect only after auth check finishes
+  // 2) Redirect only AFTER auth check finishes
   useEffect(() => {
     if (authLoading) return;
     if (!user && !redirectedRef.current) {
@@ -57,18 +61,21 @@ export default function Orders() {
   // 3) Load orders once authenticated
   useEffect(() => {
     let cancelled = false;
+
     (async () => {
       if (authLoading || !user) return;
       setLoadingOrders(true);
       try {
         const res = await api.get(ORDERS_PATH);
         const data = Array.isArray(res.data) ? res.data : [];
+
         // de-duplicate + newest first (defensive)
         const byId = new Map();
         for (const o of data) if (!byId.has(o._id)) byId.set(o._id, o);
         const uniqueSorted = [...byId.values()].sort(
           (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
         );
+
         if (!cancelled) setOrders(uniqueSorted);
       } catch (err) {
         if (!cancelled) {
@@ -78,6 +85,7 @@ export default function Orders() {
         if (!cancelled) setLoadingOrders(false);
       }
     })();
+
     return () => {
       cancelled = true;
     };
