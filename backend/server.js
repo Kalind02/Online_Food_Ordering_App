@@ -21,9 +21,11 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: (origin, cb) => {
-    // allow server-to-server/no-origin (curl, Postman) and allowed frontends
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-    return cb(new Error(`CORS blocked for origin: ${origin}`));
+    // allow server-to-server/no-origin and known frontends; never throw
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    // disallow silently (no CORS headers) instead of throwing 500
+    return cb(null, false);
   },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key"],
