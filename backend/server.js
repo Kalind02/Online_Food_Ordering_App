@@ -12,7 +12,17 @@ import contactRoutes from "./routes/contactRoutes.js";
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+app.use(cors({
+  origin: (origin, cb) => {
+    const allowed = [process.env.FRONTEND_ORIGIN];
+    // allow same-origin / server-to-server / local tools with no Origin
+    if (!origin) return cb(null, true);
+    cb(null, allowed.includes(origin));
+  },
+  credentials: true, // only if you use cookies/sessions; safe to leave true
+}));
+
 app.use(express.json());
 
 app.get("/", (_req, res) => res.send("🍔 Online Food Ordering System API is running."));
