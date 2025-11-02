@@ -14,7 +14,6 @@ dotenv.config();
 const app = express();
 
 // --- CORS ---
-import cors from "cors";
 
 const MAIN_ORIGIN = process.env.FRONTEND_ORIGIN?.replace(/\/+$/, ""); // no trailing slash
 const allowedFixed = [MAIN_ORIGIN, "http://localhost:3000"].filter(Boolean);
