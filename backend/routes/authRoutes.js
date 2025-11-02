@@ -6,7 +6,7 @@ import User from "../models/User.js";
 const router = express.Router();
 
 // ✅ REGISTER
-router.post("/api/register", async (req, res) => {
+router.post("/register", async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
@@ -24,7 +24,7 @@ router.post("/api/register", async (req, res) => {
 });
 
 // ✅ LOGIN
-router.post("/api/login", async (req, res) => {
+router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -52,7 +52,7 @@ router.post("/api/login", async (req, res) => {
 });
 
 // ✅ PROFILE (GET USER INFO)
-router.get("/api/me", async (req, res) => {
+router.get("/me", async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader)
