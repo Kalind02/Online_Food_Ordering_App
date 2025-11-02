@@ -19,7 +19,7 @@ const verifyUser = (req, res, next) => {
 };
 
 // Create order (idempotent)
-router.post("/", verifyUser, async (req, res) => {
+router.post("/api/", verifyUser, async (req, res) => {
   try {
     const { items, total } = req.body;
     const clientKey = req.get("Idempotency-Key") || req.body.clientKey;
@@ -69,7 +69,7 @@ router.post("/", verifyUser, async (req, res) => {
 });
 
 // List orders for the logged-in user
-router.get("/", verifyUser, async (req, res) => {
+router.get("/api/", verifyUser, async (req, res) => {
   try {
     const orders = await Order.find({ user: req.user.id })
       .sort({ createdAt: -1 })

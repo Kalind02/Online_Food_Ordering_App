@@ -8,7 +8,7 @@ const router = express.Router();
  * POST /api/contact
  * Save a contact message
  */
-router.post("/", async (req, res) => {
+router.post("/api/", async (req, res) => {
   try {
     const { name, email, message } = req.body;
 
