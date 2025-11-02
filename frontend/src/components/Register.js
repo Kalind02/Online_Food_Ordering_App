@@ -16,7 +16,7 @@ export default function Register() {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.post("/api/auth/register", formData);
+      await api.post("/auth/register", formData);
       alert("Registration successful! Please login.");
       navigate("/login");
     } catch (err) {
