@@ -14,15 +14,25 @@ dotenv.config();
 const app = express();
 
 // --- CORS ---
-// Set this on Render: FRONTEND_ORIGIN=https://<your-vercel-app>.vercel.app
-app.use(cors({
-  origin: process.env.FRONTEND_ORIGIN, // single frontend origin
+const allowedOrigins = [
+  process.env.FRONTEND_ORIGIN?.replace(/\/+$/, ""), // strip trailing slash if someone added it
+  "http://localhost:3000",                          // optional: for local dev
+].filter(Boolean);
+
+const corsOptions = {
+  origin: (origin, cb) => {
+    // allow server-to-server/no-origin (curl, Postman) and allowed frontends
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error(`CORS blocked for origin: ${origin}`));
+  },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: false, // set to true ONLY if you actually use cookies
-}));
-// Ensure preflight never 404s
-app.options("*", cors());
+  allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key"],
+  credentials: false, // set true ONLY if you actually use cookies/sessions
+};
+
+app.use(cors(corsOptions));
+// Ensure preflight never 404s AND returns identical CORS headers
+app.options("*", cors(corsOptions));
 
 // --- Parsers ---
 app.use(express.json());
