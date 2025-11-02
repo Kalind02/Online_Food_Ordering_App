@@ -13,31 +13,38 @@ export default function Orders() {
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
 
-  // Prevent duplicate redirect/alert under StrictMode
+  // prevent duplicate redirects/alerts in StrictMode
   const redirectedRef = useRef(false);
 
-  // 1) Verify auth first
+  // Detect if api baseURL already includes `/api`
+  const baseHasApi =
+    typeof api?.defaults?.baseURL === "string" &&
+    /\/api\/?$/.test(api.defaults.baseURL);
+  const ME_PATH = baseHasApi ? "/auth/me" : "/api/auth/me";
+  const ORDERS_PATH = baseHasApi ? "/orders" : "/api/orders";
+
+  // 1) Verify auth first (using token from interceptor/localStorage)
   useEffect(() => {
     let cancelled = false;
-
-    async function verify() {
+    (async () => {
       try {
         const token = localStorage.getItem("token");
         if (!token) return; // not logged in
-        const { data } = await api.get("/api/auth/me"); // if baseURL already has /api -> change to "/auth/me"
+        const { data } = await api.get(ME_PATH);
         if (!cancelled) setUser(data);
-      } catch {
-        // token missing/invalid → user stays null
+      } catch (err) {
+        // leave user null; optionally log for debugging
+        // console.error("auth/me failed:", err?.response?.status, err?.message);
       } finally {
         if (!cancelled) setAuthLoading(false);
       }
-    }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ME_PATH]);
 
-    verify();
-    return () => { cancelled = true; };
-  }, []);
-
-  // 2) Redirect to login only after auth check finishes
+  // 2) Redirect only after auth check finishes
   useEffect(() => {
     if (authLoading) return;
     if (!user && !redirectedRef.current) {
@@ -47,26 +54,21 @@ export default function Orders() {
     }
   }, [authLoading, user, navigate]);
 
-  // 3) Load orders once we know the user is authenticated
+  // 3) Load orders once authenticated
   useEffect(() => {
     let cancelled = false;
-
-    async function loadOrders() {
-      if (authLoading || !user) return; // wait until verified
+    (async () => {
+      if (authLoading || !user) return;
       setLoadingOrders(true);
       try {
-        const res = await api.get("/api/orders"); // if baseURL has /api -> change to "/orders"
+        const res = await api.get(ORDERS_PATH);
         const data = Array.isArray(res.data) ? res.data : [];
-
-        // de-duplicate (defensive)
+        // de-duplicate + newest first (defensive)
         const byId = new Map();
         for (const o of data) if (!byId.has(o._id)) byId.set(o._id, o);
-
-        // newest first (defensive)
         const uniqueSorted = [...byId.values()].sort(
           (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
         );
-
         if (!cancelled) setOrders(uniqueSorted);
       } catch (err) {
         if (!cancelled) {
@@ -75,13 +77,13 @@ export default function Orders() {
       } finally {
         if (!cancelled) setLoadingOrders(false);
       }
-    }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, user, ORDERS_PATH]);
 
-    loadOrders();
-    return () => { cancelled = true; };
-  }, [authLoading, user]);
-
-  // While verifying auth, or immediately after redirecting, render nothing
+  // While verifying, or right after redirecting, render nothing
   if (authLoading || (!user && redirectedRef.current)) return null;
 
   const noOrders = !loadingOrders && orders.length === 0;
