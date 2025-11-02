@@ -13,28 +13,35 @@ dotenv.config();
 
 const app = express();
 
+// --- CORS ---
+// Set this on Render: FRONTEND_ORIGIN=https://<your-vercel-app>.vercel.app
 app.use(cors({
-  origin: (origin, cb) => {
-    const allowed = [process.env.FRONTEND_ORIGIN];
-    // allow same-origin / server-to-server / local tools with no Origin
-    if (!origin) return cb(null, true);
-    cb(null, allowed.includes(origin));
-  },
-  credentials: true, // only if you use cookies/sessions; safe to leave true
+  origin: process.env.FRONTEND_ORIGIN, // single frontend origin
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: false, // set to true ONLY if you actually use cookies
 }));
+// Ensure preflight never 404s
+app.options("*", cors());
 
+// --- Parsers ---
 app.use(express.json());
 
+// --- Health + root ---
 app.get("/", (_req, res) => res.send("🍔 Online Food Ordering System API is running."));
+app.get("/health", (_req, res) => {
+  res.status(200).json({ ok: true, time: new Date().toISOString() });
+});
 
-// ✅ Ensure DB is up before listening
+// --- Connect DB before routes ---
 await connectDB();
 
+// --- Routes (note the /api prefix) ---
 app.use("/api/auth", authRoutes);
 app.use("/api/restaurants", restaurantRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/contact", contactRoutes);
 
+// --- Start ---
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-
